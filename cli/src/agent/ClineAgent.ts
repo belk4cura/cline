@@ -1164,7 +1164,6 @@ export class ClineAgent implements acp.Agent {
 
 		// For OpenAI Codex provider, check OAuth credentials
 		if (currentProvider === "openai-codex") {
-			openAiCodexOAuthManager.initialize(this.ctx.extensionContext)
 			return await openAiCodexOAuthManager.isAuthenticated()
 		}
 
@@ -1198,9 +1197,6 @@ export class ClineAgent implements acp.Agent {
 		Logger.debug("[ClineAgent] Starting OpenAI Codex OAuth flow...")
 
 		try {
-			// Initialize the OAuth manager with extension context
-			openAiCodexOAuthManager.initialize(this.ctx.extensionContext)
-
 			// Get the authorization URL and start the callback server
 			const authUrl = openAiCodexOAuthManager.startAuthorizationFlow()
 

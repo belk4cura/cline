@@ -74,7 +74,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// 3. One-time export of VSCode's native storage to shared file-backed stores.
 	// After this, all platforms (VSCode, CLI, JetBrains) read from ~/.cline/data/.
-	const storageContext = createStorageContext()
+	const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+	const storageContext = createStorageContext({ workspacePath })
 	await exportVSCodeStorageToSharedFiles(context, storageContext)
 
 	// 4. Register services and perform common initialization
