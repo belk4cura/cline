@@ -4,6 +4,7 @@ import "./utils/path" // necessary to have access to String.prototype.toPosix
 
 import { HostProvider } from "@/hosts/host-provider"
 import { Logger } from "@/shared/services/Logger"
+import type { StorageContext } from "@/shared/storage/storage-context"
 import { FileContextTracker } from "./core/context/context-tracking/FileContextTracker"
 import { clearOnboardingModelsCache } from "./core/controller/models/getClineOnboardingModels"
 import { HookDiscoveryCache } from "./core/hooks/HookDiscoveryCache"
@@ -32,7 +33,7 @@ import { arePathsEqual } from "./utils/path"
  * @returns The webview provider
  * @throws ClineConfigurationError if endpoints.json exists but is invalid
  */
-export async function initialize(context: vscode.ExtensionContext): Promise<WebviewProvider> {
+export async function initialize(context: vscode.ExtensionContext, storageContext: StorageContext): Promise<WebviewProvider> {
 	// Configure the shared Logging class to use HostProvider's output channels and debug logger
 	Logger.subscribe((msg: string) => HostProvider.get().logToChannel(msg)) // File system logging
 	Logger.subscribe((msg: string) => HostProvider.env.debugLog({ value: msg })) // Host debug logging
@@ -47,7 +48,7 @@ export async function initialize(context: vscode.ExtensionContext): Promise<Webv
 	await initializeDistinctId(context)
 
 	try {
-		await StateManager.initialize(context)
+		await StateManager.initialize(storageContext)
 	} catch (error) {
 		Logger.error("[Cline] CRITICAL: Failed to initialize StateManager:", error)
 		HostProvider.window.showMessage({

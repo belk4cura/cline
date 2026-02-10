@@ -60,7 +60,11 @@ async function main() {
 		// The host bridge should be available before creating the host provider because it depends on the host bridge.
 		setupHostProvider(extensionContext, EXTENSION_DIR, DATA_DIR)
 
-		const webviewProvider = await initialize(extensionContext)
+		// Create shared file-backed storage
+		const { createStorageContext } = await import("@/shared/storage/storage-context")
+		const storageContext = createStorageContext()
+
+		const webviewProvider = await initialize(extensionContext, storageContext)
 
 		// Enable the localhost HTTP server that handles auth redirects.
 		AuthHandler.getInstance().setEnabled(true)

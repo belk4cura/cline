@@ -15,10 +15,9 @@ import {
 	type Settings,
 	type SettingsKey,
 } from "@shared/storage/state-keys"
+import type { StorageContext } from "@shared/storage/storage-context"
 import chokidar, { type FSWatcher } from "chokidar"
-import type { ExtensionContext } from "vscode"
 import { Logger } from "@/shared/services/Logger"
-import { secretStorage } from "@/shared/storage/ClineSecretStorage"
 import {
 	getTaskHistoryStateFilePath,
 	readTaskHistoryFromState,
@@ -28,7 +27,7 @@ import {
 } from "./disk"
 import { STATE_MANAGER_NOT_INITIALIZED } from "./error-messages"
 import { filterAllowedRemoteConfigFields } from "./remote-config/utils"
-import { readGlobalStateFromDisk, readSecretsFromDisk, readWorkspaceStateFromDisk } from "./utils/state-helpers"
+import { readGlobalStateFromStorage, readSecretsFromStorage, readWorkspaceStateFromStorage } from "./utils/state-helpers"
 export interface PersistenceErrorEvent {
 	error: Error
 }
@@ -36,6 +35,9 @@ export interface PersistenceErrorEvent {
 /**
  * In-memory state manager for fast state access.
  * Provides immediate reads/writes with async disk persistence.
+ *
+ * All persistent storage is backed by file-based stores via StorageContext.
+ * This is shared across all platforms (VSCode, CLI, JetBrains).
  *
  * MULTI-INSTANCE BEHAVIOR:
  * StateManager reads from disk ONLY during initialize(). After that, all reads come from
@@ -59,7 +61,12 @@ export class StateManager {
 	private remoteConfigCache: Partial<RemoteConfigFields> = {} as RemoteConfigFields
 	private secretsCache: Secrets = {} as Secrets
 	private workspaceStateCache: LocalState = {} as LocalState
-	private context: ExtensionContext
+
+	/**
+	 * File-backed storage context. All reads/writes to persistent state go through here.
+	 * Do NOT access VSCode's ExtensionContext for storage — use this instead.
+	 */
+	private storage: StorageContext
 	private isInitialized = false
 
 	// Cache TTL: 1 hour - long enough to prevent duplicate fetches, short enough to see new models
@@ -106,17 +113,16 @@ export class StateManager {
 	// Callback to sync external state changes with the UI client
 	onSyncExternalChange?: () => void | Promise<void>
 
-	private constructor(context: ExtensionContext) {
-		this.context = context
-		secretStorage.init(context.secrets)
+	private constructor(storage: StorageContext) {
+		this.storage = storage
 	}
 
 	/**
-	 * Initialize the cache by loading data from disk
+	 * Initialize the cache by loading data from the file-backed StorageContext.
 	 */
-	public static async initialize(context: ExtensionContext): Promise<StateManager> {
+	public static async initialize(storage: StorageContext): Promise<StateManager> {
 		if (!StateManager.instance) {
-			StateManager.instance = new StateManager(context)
+			StateManager.instance = new StateManager(storage)
 		}
 
 		if (StateManager.instance.isInitialized) {
@@ -124,10 +130,10 @@ export class StateManager {
 		}
 
 		try {
-			// Load all extension state from disk
-			const globalState = await readGlobalStateFromDisk(context)
-			const secrets = await readSecretsFromDisk()
-			const workspaceState = await readWorkspaceStateFromDisk(context)
+			// Load all extension state from file-backed stores
+			const globalState = await readGlobalStateFromStorage(storage.globalState)
+			const secrets = readSecretsFromStorage(storage.secrets)
+			const workspaceState = readWorkspaceStateFromStorage(storage.workspaceState)
 
 			// Populate the cache with all extension state and secrets fields
 			// Use populate method to avoid triggering persistence during initialization
@@ -150,6 +156,13 @@ export class StateManager {
 			throw new Error("StateManager has not been initialized")
 		}
 		return StateManager.instance
+	}
+
+	/**
+	 * Get the underlying StorageContext (for migration or advanced use only).
+	 */
+	public getStorageContext(): StorageContext {
+		return this.storage
 	}
 
 	/**
@@ -289,8 +302,6 @@ export class StateManager {
 				this.pendingTaskState.clear()
 			} catch (error) {
 				Logger.error("[StateManager] Failed to persist task settings before clearing:", error)
-				// If persistence fails, we just move on with clearing the in-memory state.
-				// clearTaskSettings realistically probably won't be called in the small window of time between task settings being set and their persistence anyways
 			}
 		}
 
@@ -604,8 +615,6 @@ export class StateManager {
 			throw new Error(STATE_MANAGER_NOT_INITIALIZED)
 		}
 		if (this.remoteConfigCache[key] !== undefined) {
-			// type casting here, TS cannot infer that the key will ONLY be one of Settings
-
 			return this.remoteConfigCache[key] as Settings[K]
 		}
 		if (this.taskStateCache[key] !== undefined) {
@@ -622,7 +631,6 @@ export class StateManager {
 			throw new Error(STATE_MANAGER_NOT_INITIALIZED)
 		}
 		if (this.remoteConfigCache[key] !== undefined) {
-			// type casting here, TS cannot infer that the key will ONLY be one of GlobalState
 			return this.remoteConfigCache[key] as GlobalState[K]
 		}
 		return this.globalStateCache[key]
@@ -656,8 +664,8 @@ export class StateManager {
 		// Clear all cached data and pending state
 		this.dispose()
 
-		// Reinitialize from disk
-		await StateManager.initialize(this.context)
+		// Reinitialize from the same storage context
+		await StateManager.initialize(this.storage)
 
 		// If there's an active task, reload its settings
 		if (currentTaskId) {
@@ -763,21 +771,25 @@ export class StateManager {
 	}
 
 	/**
-	 * Private method to batch persist global state keys with Promise.all
+	 * Persist global state keys to the file-backed store.
+	 * Uses setBatch for efficiency (single disk write).
 	 */
 	private async persistGlobalStateBatch(keys: Set<GlobalStateAndSettingsKey>): Promise<void> {
-		try {
-			await Promise.all(
-				Array.from(keys).map((key) => {
-					if (key === "taskHistory") {
-						// Route task history persistence to file, not VS Code globalState
-						return writeTaskHistoryToState(this.globalStateCache[key])
-					}
-					return this.context.globalState.update(key, this.globalStateCache[key])
-				}),
-			)
-		} catch (error) {
-			throw error
+		// Separate taskHistory (goes to its own file) from regular global state
+		const regularEntries: Record<string, any> = {}
+
+		for (const key of keys) {
+			if (key === "taskHistory") {
+				// Route task history persistence to its own file
+				await writeTaskHistoryToState(this.globalStateCache[key])
+			} else {
+				regularEntries[key] = this.globalStateCache[key]
+			}
+		}
+
+		// Batch write all regular keys in a single disk operation
+		if (Object.keys(regularEntries).length > 0) {
+			this.storage.globalState.setBatch(regularEntries)
 		}
 	}
 
@@ -788,61 +800,47 @@ export class StateManager {
 		if (pendingTaskStates.size === 0) {
 			return
 		}
-		try {
-			// Persist each task's settings
-			await Promise.all(
-				Array.from(pendingTaskStates.entries()).map(([taskId, keys]) => {
-					if (keys.size === 0) {
-						return Promise.resolve()
+		// Persist each task's settings
+		await Promise.all(
+			Array.from(pendingTaskStates.entries()).map(([taskId, keys]) => {
+				if (keys.size === 0) {
+					return Promise.resolve()
+				}
+				const settingsToWrite: Record<string, any> = {}
+				for (const key of keys) {
+					const value = this.taskStateCache[key]
+					if (value !== undefined) {
+						settingsToWrite[key] = value
 					}
-					const settingsToWrite: Record<string, any> = {}
-					for (const key of keys) {
-						const value = this.taskStateCache[key]
-						if (value !== undefined) {
-							settingsToWrite[key] = value
-						}
-					}
-					return writeTaskSettingsToStorage(taskId, settingsToWrite)
-				}),
-			)
-		} catch (error) {
-			throw error
-		}
+				}
+				return writeTaskSettingsToStorage(taskId, settingsToWrite)
+			}),
+		)
 	}
 
 	/**
-	 * Private method to batch persist secrets with Promise.all
+	 * Persist secrets to the file-backed store.
+	 * Uses setBatch for efficiency (single disk write).
 	 */
 	private async persistSecretsBatch(keys: Set<SecretKey>): Promise<void> {
-		try {
-			await Promise.all(
-				Array.from(keys).map((key) => {
-					const value = this.secretsCache[key]
-					if (value) {
-						return this.context.secrets.store(key, value)
-					}
-					return this.context.secrets.delete(key)
-				}),
-			)
-		} catch (error) {
-			throw error
+		const entries: Record<string, string | undefined> = {}
+		for (const key of keys) {
+			const value = this.secretsCache[key]
+			entries[key] = value || undefined // Convert empty strings to undefined (delete)
 		}
+		this.storage.secrets.setBatch(entries)
 	}
 
 	/**
-	 * Private method to batch persist workspace state keys with Promise.all
+	 * Persist workspace state to the file-backed store.
+	 * Uses setBatch for efficiency (single disk write).
 	 */
 	private async persistWorkspaceStateBatch(keys: Set<LocalStateKey>): Promise<void> {
-		try {
-			await Promise.all(
-				Array.from(keys).map((key) => {
-					const value = this.workspaceStateCache[key]
-					return this.context.workspaceState.update(key, value)
-				}),
-			)
-		} catch (error) {
-			throw error
+		const entries: Record<string, any> = {}
+		for (const key of keys) {
+			entries[key] = this.workspaceStateCache[key]
 		}
+		this.storage.workspaceState.setBatch(entries)
 	}
 
 	/**

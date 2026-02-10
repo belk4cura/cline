@@ -1,4 +1,5 @@
 import { ApiProvider } from "@shared/api"
+import type { ClineFileStorage } from "@shared/storage/ClineFileStorage"
 import {
 	applyTransform,
 	GlobalStateAndSettingKeys,
@@ -18,6 +19,77 @@ import { Logger } from "@/shared/services/Logger"
 import { secretStorage } from "@/shared/storage"
 import { readTaskHistoryFromState } from "../disk"
 
+// ─── File-backed storage readers (used by StateManager) ────────────────────
+
+/**
+ * Read secrets from a ClineFileStorage instance.
+ */
+export function readSecretsFromStorage(store: ClineFileStorage<string>): Secrets {
+	return SecretKeys.reduce((acc, key) => {
+		acc[key] = store.get(key)
+		return acc
+	}, {} as Secrets)
+}
+
+/**
+ * Read workspace state from a ClineFileStorage instance.
+ */
+export function readWorkspaceStateFromStorage(store: ClineFileStorage): LocalState {
+	return LocalStateKeys.reduce((acc, key) => {
+		acc[key] = store.get(key) || {}
+		return acc
+	}, {} as LocalState)
+}
+
+/**
+ * Read global state from a ClineFileStorage instance.
+ */
+export async function readGlobalStateFromStorage(store: ClineFileStorage): Promise<GlobalStateAndSettings> {
+	try {
+		// Batch read all state values in a single optimized pass
+		const stateValues = new Map<string, any>()
+		for (const key of GlobalStateAndSettingKeys) {
+			const value = store.get(key as string)
+			stateValues.set(key, value)
+		}
+
+		const result = {} as any
+
+		for (const key of GlobalStateAndSettingKeys) {
+			const stateKey = key as keyof GlobalStateAndSettings
+			let value = stateValues.get(stateKey)
+
+			if (isAsyncProperty(stateKey)) {
+				continue
+			}
+			if (isComputedProperty(stateKey)) {
+				continue
+			}
+			if (value === undefined) {
+				const defaultValue = getDefaultValue(stateKey)
+				if (defaultValue !== undefined) {
+					value = defaultValue
+				}
+			}
+			if (value !== undefined) {
+				value = applyTransform(stateKey, value)
+			}
+			result[stateKey] = value
+		}
+
+		await handleComputedProperties(result, stateValues)
+		await handleAsyncProperties(result)
+
+		return result as GlobalStateAndSettings
+	} catch (error) {
+		Logger.error("[StateHelpers] Failed to read global state from storage:", error)
+		throw error
+	}
+}
+
+// ─── Legacy readers (for VSCode migration — reads from ExtensionContext) ────
+
+/** @deprecated Use readSecretsFromStorage instead */
 export async function readSecretsFromDisk(): Promise<Secrets> {
 	const secrets = await Promise.all(SecretKeys.map((key) => secretStorage.get(key)))
 
@@ -27,6 +99,7 @@ export async function readSecretsFromDisk(): Promise<Secrets> {
 	}, {} as Secrets)
 }
 
+/** @deprecated Use readWorkspaceStateFromStorage instead */
 export async function readWorkspaceStateFromDisk(context: ExtensionContext): Promise<LocalState> {
 	const states = LocalStateKeys.map((key) => context.workspaceState.get<ClineRulesToggles | undefined>(key))
 
@@ -36,6 +109,7 @@ export async function readWorkspaceStateFromDisk(context: ExtensionContext): Pro
 	}, {} as LocalState)
 }
 
+/** @deprecated Use readGlobalStateFromStorage instead */
 export async function readGlobalStateFromDisk(context: ExtensionContext): Promise<GlobalStateAndSettings> {
 	try {
 		// Batch read all state values in a single optimized pass

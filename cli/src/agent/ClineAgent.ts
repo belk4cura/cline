@@ -174,7 +174,7 @@ export class ClineAgent implements acp.Agent {
 		this.clientCapabilities = params.clientCapabilities
 		this.initializeHostProvider(this.clientCapabilities, connection)
 		await ClineEndpoint.initialize(this.ctx.EXTENSION_DIR)
-		await StateManager.initialize(this.ctx.extensionContext)
+		await StateManager.initialize(this.ctx.storageContext)
 
 		return {
 			protocolVersion: PROTOCOL_VERSION,
