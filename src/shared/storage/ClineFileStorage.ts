@@ -68,10 +68,6 @@ export class ClineFileStorage<T = any> extends ClineSyncStorage<T> {
 		}
 		if (changed) {
 			this.writeToDisk()
-			// Fire change events for each key
-			for (const key of Object.keys(entries)) {
-				this.fire(key)
-			}
 		}
 	}
 
