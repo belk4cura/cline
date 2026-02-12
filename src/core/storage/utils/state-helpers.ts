@@ -12,9 +12,7 @@ import {
 	SecretKeys,
 	Secrets,
 } from "@shared/storage/state-keys"
-import { ExtensionContext } from "vscode"
 import { Controller } from "@/core/controller"
-import { ClineRulesToggles } from "@/shared/cline-rules"
 import { Logger } from "@/shared/services/Logger"
 import { secretStorage } from "@/shared/storage"
 import { readTaskHistoryFromState } from "../disk"
@@ -88,84 +86,6 @@ export async function readGlobalStateFromStorage(store: ClineFileStorage): Promi
 }
 
 // ─── Legacy readers (for VSCode migration — reads from ExtensionContext) ────
-
-/** @deprecated Use readSecretsFromStorage instead */
-export async function readSecretsFromDisk(): Promise<Secrets> {
-	const secrets = await Promise.all(SecretKeys.map((key) => secretStorage.get(key)))
-
-	return SecretKeys.reduce((acc, key, index) => {
-		acc[key] = secrets[index]
-		return acc
-	}, {} as Secrets)
-}
-
-/** @deprecated Use readWorkspaceStateFromStorage instead */
-export async function readWorkspaceStateFromDisk(context: ExtensionContext): Promise<LocalState> {
-	const states = LocalStateKeys.map((key) => context.workspaceState.get<ClineRulesToggles | undefined>(key))
-
-	return LocalStateKeys.reduce((acc, key, index) => {
-		acc[key] = states[index] || {}
-		return acc
-	}, {} as LocalState)
-}
-
-/** @deprecated Use readGlobalStateFromStorage instead */
-export async function readGlobalStateFromDisk(context: ExtensionContext): Promise<GlobalStateAndSettings> {
-	try {
-		// Batch read all state values in a single optimized pass
-		const stateValues = new Map<string, any>()
-		// Read all values at once for better performance
-		for (const key of GlobalStateAndSettingKeys) {
-			const value = context.globalState.get(key as string)
-			stateValues.set(key, value)
-		}
-
-		// Build result object with proper typing
-		const result = {} as any // Use any for assignment, but return proper type
-
-		// Process each state property using optimized approach
-		for (const key of GlobalStateAndSettingKeys) {
-			const stateKey = key as keyof GlobalStateAndSettings
-			let value = stateValues.get(stateKey)
-
-			// Skip async properties - they need special handling
-			if (isAsyncProperty(stateKey)) {
-				continue
-			}
-
-			// Skip computed properties - they need special handling
-			if (isComputedProperty(stateKey)) {
-				continue
-			}
-
-			// Apply default value if needed
-			if (value === undefined) {
-				const defaultValue = getDefaultValue(stateKey)
-				if (defaultValue !== undefined) {
-					value = defaultValue
-				}
-			}
-
-			// Apply transformation if provided
-			if (value !== undefined) {
-				value = applyTransform(stateKey, value)
-			}
-			// Set the processed value
-			result[stateKey] = value
-		}
-
-		// Handle computed properties with special logic
-		await handleComputedProperties(result, stateValues)
-
-		// Handle async properties
-		await handleAsyncProperties(result)
-
-		return result as GlobalStateAndSettings
-	} catch (error) {
-		Logger.error("[StateHelpers] Failed to read global state:", error)
-		throw error
-	}
-}
 
 /**
  * Handle properties that require computed logic

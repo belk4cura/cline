@@ -42,7 +42,6 @@ On VSCode startup, a migration copies data from VSCode's `ExtensionContext` stor
 - **Sentinel**: `__vscodeMigrationVersion` key in global state and workspace state — prevents re-migration.
 - **Merge strategy**: File store wins. Existing values are never overwritten.
 - **Safe downgrade**: VSCode storage is NOT cleared, so older extension versions still work.
-- **taskHistory**: Already file-based (`tasks/taskHistory.json`), not migrated by this module.
 
 ## Adding New Storage Keys
 
