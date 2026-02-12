@@ -35,7 +35,7 @@ StateManager.get().setWorkspaceState("myWsKey", value)
 
 Remember that your data may be read by a different client than the one that wrote it. For example, a value written by Cline in JetBrains may be read by Cline CLI.
 
-## VSCode Migration (src/core/storage/vscode-to-file-migration.ts)
+## VSCode Migration (src/hosts/vscode/vscode-to-file-migration.ts)
 
 On VSCode startup, a migration copies data from VSCode's `ExtensionContext` storage into the file-backed stores. This runs in `src/common.ts` before `StateManager.initialize()`.
 
