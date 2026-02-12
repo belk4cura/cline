@@ -26,6 +26,8 @@ import { getBlobStoreSettingsFromEnv } from "./shared/services/worker/worker"
 import { getLatestAnnouncementId } from "./utils/announcements"
 import { arePathsEqual } from "./utils/path"
 
+type SlimExtensionContext = Omit<vscode.ExtensionContext, "globalState" | "secrets" | "workspaceState">
+
 /**
  * Performs intialization for Cline that is common to all platforms.
  *
@@ -33,7 +35,7 @@ import { arePathsEqual } from "./utils/path"
  * @returns The webview provider
  * @throws ClineConfigurationError if endpoints.json exists but is invalid
  */
-export async function initialize(context: vscode.ExtensionContext, storageContext: StorageContext): Promise<WebviewProvider> {
+export async function initialize(context: SlimExtensionContext, storageContext: StorageContext): Promise<WebviewProvider> {
 	// Configure the shared Logging class to use HostProvider's output channels and debug logger
 	Logger.subscribe((msg: string) => HostProvider.get().logToChannel(msg)) // File system logging
 	Logger.subscribe((msg: string) => HostProvider.env.debugLog({ value: msg })) // Host debug logging
@@ -45,7 +47,7 @@ export async function initialize(context: vscode.ExtensionContext, storageContex
 	await ClineEndpoint.initialize(HostProvider.get().extensionFsPath)
 
 	// Set the distinct ID for logging and telemetry
-	await initializeDistinctId(context)
+	await initializeDistinctId(storageContext)
 
 	try {
 		await StateManager.initialize(storageContext)
@@ -71,7 +73,7 @@ export async function initialize(context: vscode.ExtensionContext, storageContex
 
 	const stateManager = StateManager.get()
 	// Non-blocking announcement check and display
-	showVersionUpdateAnnouncement(context)
+	showVersionUpdateAnnouncement(stateManager)
 	// Check if this workspace was opened from worktree quick launch
 	await checkWorktreeAutoOpen(stateManager)
 
@@ -82,24 +84,24 @@ export async function initialize(context: vscode.ExtensionContext, storageContex
 	// Clean up old temp files in background (non-blocking) and start periodic cleanup every 24 hours
 	ClineTempManager.startPeriodicCleanup()
 	// Clean up orphaned file context warnings (startup cleanup)
-	FileContextTracker.cleanupOrphanedWarnings(context)
+	FileContextTracker.cleanupOrphanedWarnings(stateManager)
 
 	telemetryService.captureExtensionActivated()
 
 	return webview
 }
 
-async function showVersionUpdateAnnouncement(context: vscode.ExtensionContext) {
+async function showVersionUpdateAnnouncement(stateManager: StateManager) {
 	// Version checking for autoupdate notification
 	const currentVersion = ExtensionRegistryInfo.version
-	const previousVersion = context.globalState.get<string>("clineVersion")
+	const previousVersion = stateManager.getGlobalStateKey("clineVersion")
 	// Perform post-update actions if necessary
 	try {
 		if (!previousVersion || currentVersion !== previousVersion) {
 			Logger.log(`Cline version changed: ${previousVersion} -> ${currentVersion}. First run or update detected.`)
 
 			// Check if there's a new announcement to show
-			const lastShownAnnouncementId = context.globalState.get<string>("lastShownAnnouncementId")
+			const lastShownAnnouncementId = stateManager.getGlobalStateKey("lastShownAnnouncementId")
 			const latestAnnouncementId = getLatestAnnouncementId()
 
 			if (lastShownAnnouncementId !== latestAnnouncementId) {
@@ -113,7 +115,7 @@ async function showVersionUpdateAnnouncement(context: vscode.ExtensionContext) {
 				})
 			}
 			// Always update the main version tracker for the next launch.
-			await context.globalState.update("clineVersion", currentVersion)
+			await stateManager.setGlobalState("clineVersion", currentVersion)
 		}
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error)

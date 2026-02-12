@@ -94,10 +94,32 @@ export class ClineFileStorage<T = any> extends ClineSyncStorage<T> {
 		try {
 			const dir = path.dirname(this.fsPath)
 			fs.mkdirSync(dir, { recursive: true })
-			const options: fs.WriteFileOptions = this.fileMode ? { encoding: "utf-8", mode: this.fileMode } : "utf-8"
-			fs.writeFileSync(this.fsPath, JSON.stringify(this.data, null, 2), options)
+			atomicWriteFileSync(this.fsPath, JSON.stringify(this.data, null, 2), this.fileMode)
 		} catch (error) {
 			Logger.error(`[${this.name}] failed to write to ${this.fsPath}:`, error)
 		}
+	}
+}
+
+/**
+ * Synchronously, atomically write data to a file using temp file + rename pattern.
+ * Prefer core/storage's async atomicWriteFile to this.
+ */
+function atomicWriteFileSync(filePath: string, data: string, mode?: fs.Mode | undefined): void {
+	const tmpPath = `${filePath}.tmp.${Date.now()}.${Math.random().toString(36).substring(7)}.json`
+	try {
+		fs.writeFileSync(tmpPath, data, {
+			flag: "wx",
+			encoding: "utf-8",
+			mode,
+		})
+		// Rename temp file to target (atomic in most cases)
+		fs.renameSync(tmpPath, filePath)
+	} catch (error) {
+		// Clean up temp file if it exists
+		try {
+			fs.unlinkSync(tmpPath)
+		} catch {}
+		throw error
 	}
 }

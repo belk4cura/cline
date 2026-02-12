@@ -1,11 +1,11 @@
-import { mkdirSync } from "node:fs"
+import fsSync from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { ClineFileStorage } from "./ClineFileStorage"
 
 /**
  * The storage backend context object used by StateManager and other components.
- * All persistent key-value storage goes through these three stores.
+ * Global, workspace and secret key-value storage goes through this component.
  *
  * This replaces the previous pattern of passing VSCode's ExtensionContext around
  * for storage access. All platforms (VSCode, CLI, JetBrains) use the same
@@ -55,7 +55,7 @@ const SETTINGS_SUBFOLDER = "data"
 
 /**
  * Create a short deterministic hash of a string for use in directory names.
- * Produces an 8-character hex string.
+ * Produces an up-to-8-character hex string.
  */
 function hashString(str: string): string {
 	let hash = 0
@@ -64,7 +64,7 @@ function hashString(str: string): string {
 		hash = (hash << 5) - hash + char
 		hash = hash & hash // Convert to 32-bit integer
 	}
-	return Math.abs(hash).toString(16).padStart(8, "0").substring(0, 8)
+	return Math.abs(hash).toString(16).substring(0, 8)
 }
 
 /**
@@ -98,8 +98,8 @@ export function createStorageContext(opts: StorageContextOptions = {}): StorageC
 	}
 
 	// Ensure directories exist
-	mkdirSync(dataDir, { recursive: true })
-	mkdirSync(workspaceDir, { recursive: true })
+	fsSync.mkdirSync(dataDir, { recursive: true })
+	fsSync.mkdirSync(workspaceDir, { recursive: true })
 
 	return {
 		globalState: new ClineFileStorage(path.join(dataDir, "globalState.json"), "GlobalState"),

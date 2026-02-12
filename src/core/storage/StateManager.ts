@@ -159,13 +159,6 @@ export class StateManager {
 	}
 
 	/**
-	 * Get the underlying StorageContext (for migration or advanced use only).
-	 */
-	public getStorageContext(): StorageContext {
-		return this.storage
-	}
-
-	/**
 	 * Register callbacks for state manager events
 	 */
 	public registerCallbacks(callbacks: {

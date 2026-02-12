@@ -12,6 +12,7 @@ import { HostProvider } from "@/hosts/host-provider"
 import { DiffViewProvider } from "@/integrations/editor/DiffViewProvider"
 import { StandaloneTerminalManager } from "@/integrations/terminal"
 import { Logger } from "@/shared/services/Logger"
+import { createStorageContext } from "@/shared/storage/storage-context"
 import { HOSTBRIDGE_PORT, waitForHostBridgeReady } from "./hostbridge-client"
 import { setLockManager } from "./lock-manager"
 import { PROTOBUS_PORT, startProtobusService } from "./protobus-service"
@@ -61,10 +62,8 @@ async function main() {
 		setupHostProvider(extensionContext, EXTENSION_DIR, DATA_DIR)
 
 		// Create shared file-backed storage
-		const { createStorageContext } = await import("@/shared/storage/storage-context")
 		const storageContext = createStorageContext()
-
-		const webviewProvider = await initialize(extensionContext, storageContext)
+		const webviewProvider = await initialize(storageContext)
 
 		// Enable the localhost HTTP server that handles auth redirects.
 		AuthHandler.getInstance().setEnabled(true)

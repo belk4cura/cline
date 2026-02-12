@@ -1,10 +1,6 @@
 /**
  * VSCode context stub for CLI mode
  * Provides mock implementations of VSCode extension context.
- *
- * Storage is delegated to the shared StorageContext — the CLI does NOT
- * maintain its own ClineFileStorage instances for secrets or workspaceState.
- * All persistent storage flows through StorageContext → StateManager.
  */
 
 import { fileURLToPath } from "node:url"
