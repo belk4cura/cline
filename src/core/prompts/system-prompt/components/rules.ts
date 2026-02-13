@@ -41,7 +41,11 @@ const getRulesTemplateText = (context: SystemPromptContext) => `RULES
 export async function getRulesSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
 	const template = variant.componentOverrides?.[SystemPromptSection.RULES]?.template || getRulesTemplateText
 
-	const browserRules = context.supportsBrowserUse ? BROWSER_RULES : ""
+	const browserRules = context.supportsBrowserUse
+		? BROWSER_RULES
+		: context.mcpBrowserAvailable
+			? `- The user may ask generic non-development tasks, such as "what\\'s the latest news" or "look up the weather in San Diego", in which case you might use the cura-browser MCP tools (browser_navigate, browser_snapshot, browser_act, etc.) to complete the task if it makes sense to do so, rather than trying to create a website or using curl to answer the question.\n`
+			: ""
 	const browserWaitRules = context.supportsBrowserUse ? BROWSER_WAIT_RULES : ""
 	const cliRules = context.isCliEnvironment ? CLI_RULES : ""
 

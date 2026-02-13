@@ -15,10 +15,29 @@ const getCapabilitiesTemplateText = (context: SystemPromptContext) => `CAPABILIT
 export async function getCapabilitiesSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
 	const template = variant.componentOverrides?.[SystemPromptSection.CAPABILITIES]?.template || getCapabilitiesTemplateText
 
-	const browserSupport = context.supportsBrowserUse ? ", use the browser" : ""
+	const browserSupport = context.supportsBrowserUse
+		? ", use the browser"
+		: context.mcpBrowserAvailable
+			? ", use browser automation tools"
+			: ""
 	const browserCapabilities = context.supportsBrowserUse
 		? `\n- You can use the browser_action tool to interact with websites (including html files and locally running development servers) through a Puppeteer-controlled browser when you feel it is necessary in accomplishing the user's task. This tool is particularly useful for web development tasks as it allows you to launch a browser, navigate to pages, interact with elements through clicks and keyboard input, and capture the results through screenshots and console logs. This tool may be useful at key stages of web development tasks-such as after implementing new features, making substantial changes, when troubleshooting issues, or to verify the result of your work. You can analyze the provided screenshots to ensure correct rendering or identify errors, and review console logs for runtime issues.\n\t- For example, if asked to add a component to a react website, you might create the necessary files, use execute_command to run the site locally, then use browser_action to launch the browser, navigate to the local server, and verify the component renders & functions correctly before closing the browser.`
-		: ""
+		: context.mcpBrowserAvailable
+			? `\n- You have browser automation tools available via the cura-browser MCP server. These tools use accessibility tree snapshots with element refs for reliable interaction — no coordinate guessing needed.
+\t- **browser_navigate**: Navigate to a URL. Returns an accessibility snapshot with element refs (e1, e2, ...).
+\t- **browser_snapshot**: Get the current page's accessibility tree with refs. Always call this before interacting with elements.
+\t- **browser_act**: Interact with elements using refs. Actions: click, type, fill, select, hover, scroll, pressKey, drag, highlight, doubleClick, rightClick, goBack, goForward, refresh.
+\t- **browser_screenshot**: Capture a screenshot for visual verification.
+\t- **browser_evaluate**: Run JavaScript in the page context for data extraction or DOM manipulation.
+\t- **browser_wait**: Wait for text, element, URL, or load state (useful for SPAs and AJAX).
+\t- **browser_file_upload**: Upload files to file input elements.
+\t- **browser_file_download**: Download files by clicking elements.
+\t- **browser_dialog**: Handle alert/confirm/prompt dialogs.
+\t- **browser_tab_list / browser_tab_new / browser_tab_select / browser_tab_close**: Manage browser tabs.
+\t- **browser_status**: Check if a browser session is active.
+\t- Browser tools can be used alongside other tools — no need to close the browser before using file editing or command tools.
+\t- Workflow: navigate → snapshot (get refs) → act (using refs) → snapshot (verify) → screenshot (visual check).`
+			: ""
 
 	const webToolsCapabilities =
 		context.providerInfo.providerId === "cline" && context.clineWebToolsEnabled === true

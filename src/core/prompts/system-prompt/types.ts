@@ -100,6 +100,7 @@ export interface SystemPromptContext {
 		readonly visible?: readonly string[]
 	}
 	readonly supportsBrowserUse?: boolean
+	readonly mcpBrowserAvailable?: boolean
 	readonly mcpHub?: McpHub
 	readonly skills?: SkillMetadata[]
 	readonly focusChainSettings?: FocusChainSettings

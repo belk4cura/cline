@@ -1769,7 +1769,15 @@ export class Task {
 		// cline browser tool uses image recognition for navigation (requires model image support).
 		const modelSupportsBrowserUse = providerInfo.model.info.supportsImages ?? false
 
-		const supportsBrowserUse = modelSupportsBrowserUse && !disableBrowserTool // only enable browser use if the model supports it and the user hasn't disabled it
+		// Check if the cura-browser MCP server is connected — if so, disable the built-in
+		// Puppeteer-based browser_action tool and use the MCP browser tools instead.
+		// The MCP browser uses accessibility tree snapshots + ref-based targeting (OpenClaw model)
+		// which is fundamentally different from the coordinate-based Puppeteer approach.
+		const mcpBrowserAvailable = this.mcpHub.connections.some(
+			(conn) => conn.server.name === "cura-browser" && conn.server.status === "connected",
+		)
+
+		const supportsBrowserUse = mcpBrowserAvailable ? false : modelSupportsBrowserUse && !disableBrowserTool
 		const preferredLanguageRaw = this.stateManager.getGlobalSettingsKey("preferredLanguage")
 		const preferredLanguage = getLanguageKey(preferredLanguageRaw as LanguageDisplay)
 		const preferredLanguageInstructions =
@@ -1849,6 +1857,7 @@ export class Task {
 			providerInfo,
 			editorTabs,
 			supportsBrowserUse,
+			mcpBrowserAvailable,
 			mcpHub: this.mcpHub,
 			skills: availableSkills,
 			focusChainSettings: this.stateManager.getGlobalSettingsKey("focusChainSettings"),
