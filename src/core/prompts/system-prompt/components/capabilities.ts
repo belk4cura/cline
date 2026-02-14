@@ -23,20 +23,22 @@ export async function getCapabilitiesSection(variant: PromptVariant, context: Sy
 	const browserCapabilities = context.supportsBrowserUse
 		? `\n- You can use the browser_action tool to interact with websites (including html files and locally running development servers) through a Puppeteer-controlled browser when you feel it is necessary in accomplishing the user's task. This tool is particularly useful for web development tasks as it allows you to launch a browser, navigate to pages, interact with elements through clicks and keyboard input, and capture the results through screenshots and console logs. This tool may be useful at key stages of web development tasks-such as after implementing new features, making substantial changes, when troubleshooting issues, or to verify the result of your work. You can analyze the provided screenshots to ensure correct rendering or identify errors, and review console logs for runtime issues.\n\t- For example, if asked to add a component to a react website, you might create the necessary files, use execute_command to run the site locally, then use browser_action to launch the browser, navigate to the local server, and verify the component renders & functions correctly before closing the browser.`
 		: context.mcpBrowserAvailable
-			? `\n- You have browser automation tools available via the cura-browser MCP server. These tools use accessibility tree snapshots with element refs for reliable interaction — no coordinate guessing needed.
-\t- **browser_navigate**: Navigate to a URL. Returns an accessibility snapshot with element refs (e1, e2, ...).
-\t- **browser_snapshot**: Get the current page's accessibility tree with refs. Always call this before interacting with elements.
-\t- **browser_act**: Interact with elements using refs. Actions: click, type, fill, select, hover, scroll, pressKey, drag, highlight, doubleClick, rightClick, goBack, goForward, refresh.
+			? `\n- You have AI-powered browser automation tools available via the cura-browser MCP server. These tools use natural language actions — describe what you want to do and the AI handles element targeting automatically.
+\t- **browser_navigate**: Navigate to a URL (goto, goBack, goForward, refresh).
+\t- **browser_observe**: AI-powered element discovery. Describe what you're looking for (e.g., "Find all navigation links") and get back actionable selectors with descriptions.
+\t- **browser_act**: Perform actions using natural language. Just say what you want (e.g., "Click the Sign In button", "Type hello@example.com in the email field"). No element refs or coordinates needed — the AI identifies the right element.
+\t- **browser_extract**: Extract structured data from the page. Provide an instruction (e.g., "Extract all product names and prices") and a JSON schema, and get back structured data matching your schema.
 \t- **browser_screenshot**: Capture a screenshot for visual verification.
 \t- **browser_evaluate**: Run JavaScript in the page context for data extraction or DOM manipulation.
-\t- **browser_wait**: Wait for text, element, URL, or load state (useful for SPAs and AJAX).
+\t- **browser_wait**: Wait for text, element, URL, load state, or a JavaScript condition.
 \t- **browser_file_upload**: Upload files to file input elements.
 \t- **browser_file_download**: Download files by clicking elements.
 \t- **browser_dialog**: Handle alert/confirm/prompt dialogs.
-\t- **browser_tab_list / browser_tab_new / browser_tab_select / browser_tab_close**: Manage browser tabs.
+\t- **browser_console**: Retrieve console logs and page errors for debugging.
+\t- **browser_tabs**: Manage browser tabs (list, switch, close, new).
 \t- **browser_status**: Check if a browser session is active.
 \t- Browser tools can be used alongside other tools — no need to close the browser before using file editing or command tools.
-\t- Workflow: navigate → snapshot (get refs) → act (using refs) → snapshot (verify) → screenshot (visual check).`
+\t- Workflow: navigate → observe (discover elements) → act (natural language) → screenshot (visual check). Use extract for structured data gathering.`
 			: ""
 
 	const webToolsCapabilities =
