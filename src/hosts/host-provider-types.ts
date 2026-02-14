@@ -1,4 +1,5 @@
 import {
+	CredentialServiceClientInterface,
 	DiffServiceClientInterface,
 	EnvServiceClientInterface,
 	WindowServiceClientInterface,
@@ -13,6 +14,7 @@ export interface HostBridgeClientProvider {
 	envClient: EnvServiceClientInterface
 	windowClient: WindowServiceClientInterface
 	diffClient: DiffServiceClientInterface
+	credentialClient: CredentialServiceClientInterface
 }
 
 /**

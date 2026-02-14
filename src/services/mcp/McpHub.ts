@@ -44,6 +44,7 @@ import { expandEnvironmentVariables } from "@/utils/envExpansion"
 import { getServerAuthHash } from "@/utils/mcpAuth"
 import { TelemetryService } from "../telemetry/TelemetryService"
 import { DEFAULT_REQUEST_TIMEOUT_MS } from "./constants"
+import { getServerCredentials } from "./credential-client"
 import { McpOAuthManager } from "./McpOAuthManager"
 import { BaseConfigSchema, McpSettingsSchema, ServerConfigSchema } from "./schemas"
 import { McpConnection, McpServerConfig, Transport } from "./types"
@@ -380,13 +381,23 @@ export class McpHub {
 
 			switch (expandedConfig.type) {
 				case "stdio": {
+					// Fetch credentials from OS keychain via gRPC CredentialService.
+					// The settings file has env:{} (empty) — secrets live in the keychain only.
+					let keychainEnv: Record<string, string> = {}
+					try {
+						keychainEnv = await getServerCredentials(name)
+					} catch (err) {
+						Logger.log(`[McpHub] Could not fetch keychain credentials for "${name}": ${err}`)
+					}
+
 					transport = new StdioClientTransport({
 						command: expandedConfig.command,
 						args: expandedConfig.args,
 						cwd: expandedConfig.cwd,
 						env: {
 							...getDefaultEnvironment(),
-							...(expandedConfig.env || {}), // Now has expanded environment variables
+							...(expandedConfig.env || {}),
+							...keychainEnv, // Keychain credentials override settings file env
 						},
 						stderr: "pipe",
 					})

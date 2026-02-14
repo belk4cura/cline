@@ -4,6 +4,7 @@
  */
 
 import type {
+	CredentialServiceClientInterface,
 	DiffServiceClientInterface,
 	EnvServiceClientInterface,
 	WindowServiceClientInterface,
@@ -79,7 +80,7 @@ export class CliDiffServiceClient implements DiffServiceClientInterface {
  * CLI implementation of EnvService - handles environment operations
  */
 export class CliEnvServiceClient implements EnvServiceClientInterface {
-	private clipboardContent: string = ""
+	private clipboardContent = ""
 
 	private getTelemetrySetting(): proto.host.Setting {
 		// Read from StateManager - defaults to ENABLED if not set or "unset"
@@ -297,6 +298,24 @@ export class CliWorkspaceServiceClient implements WorkspaceServiceClientInterfac
 }
 
 /**
+ * CLI implementation of CredentialService - stub for CLI mode
+ * CLI mode does not have access to OS keychain credentials.
+ */
+export class CliCredentialServiceClient implements CredentialServiceClientInterface {
+	async getServerCredentials(_request: proto.cline.StringRequest): Promise<proto.host.ServerCredentials> {
+		return proto.host.ServerCredentials.create({ serverName: _request.value, env: {} })
+	}
+
+	async storeServerCredentials(_request: proto.host.ServerCredentials): Promise<proto.cline.EmptyRequest> {
+		return proto.cline.EmptyRequest.create({})
+	}
+
+	async deleteServerCredentials(_request: proto.cline.StringRequest): Promise<proto.cline.EmptyRequest> {
+		return proto.cline.EmptyRequest.create({})
+	}
+}
+
+/**
  * Create a CLI host bridge provider
  */
 export function createCliHostBridgeProvider(workspacePath?: string): HostBridgeClientProvider {
@@ -305,5 +324,6 @@ export function createCliHostBridgeProvider(workspacePath?: string): HostBridgeC
 		envClient: new CliEnvServiceClient(),
 		windowClient: new CliWindowServiceClient(),
 		diffClient: new CliDiffServiceClient(),
+		credentialClient: new CliCredentialServiceClient(),
 	}
 }

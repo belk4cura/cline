@@ -1,10 +1,12 @@
 import {
+	CredentialServiceClientInterface,
 	DiffServiceClientInterface,
 	EnvServiceClientInterface,
 	WindowServiceClientInterface,
 	WorkspaceServiceClientInterface,
 } from "@generated/hosts/host-bridge-client-types"
 import {
+	CredentialServiceClientImpl,
 	DiffServiceClientImpl,
 	EnvServiceClientImpl,
 	WindowServiceClientImpl,
@@ -22,6 +24,7 @@ export class ExternalHostBridgeClientManager implements HostBridgeClientProvider
 	envClient: EnvServiceClientInterface
 	windowClient: WindowServiceClientInterface
 	diffClient: DiffServiceClientInterface
+	credentialClient: CredentialServiceClientInterface
 
 	constructor() {
 		const address = process.env.HOST_BRIDGE_ADDRESS || `localhost:${HOSTBRIDGE_PORT}`
@@ -30,5 +33,6 @@ export class ExternalHostBridgeClientManager implements HostBridgeClientProvider
 		this.envClient = new EnvServiceClientImpl(address)
 		this.windowClient = new WindowServiceClientImpl(address)
 		this.diffClient = new DiffServiceClientImpl(address)
+		this.credentialClient = new CredentialServiceClientImpl(address)
 	}
 }

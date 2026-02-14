@@ -10,6 +10,7 @@
 
 import type * as acp from "@agentclientprotocol/sdk"
 import type {
+	CredentialServiceClientInterface,
 	DiffServiceClientInterface,
 	EnvServiceClientInterface,
 	WindowServiceClientInterface,
@@ -111,7 +112,7 @@ class ACPEnvServiceClient implements EnvServiceClientInterface {
 	constructor(
 		_clientCapabilities: acp.ClientCapabilities | undefined,
 		_sessionIdResolver: SessionIdResolver,
-		version: string = "1.0.0",
+		version = "1.0.0",
 	) {
 		this.version = version
 	}
@@ -382,11 +383,35 @@ class ACPWorkspaceServiceClient implements WorkspaceServiceClientInterface {
  * implemented for the ACP environment. Uses the ACP connection and client capabilities
  * to delegate operations to the ACP client where possible.
  */
+/**
+ * ACP implementation of CredentialService client.
+ *
+ * Stub — ACP mode does not have access to OS keychain credentials.
+ * Returns empty credentials so MCP servers fall back to env-based config.
+ */
+class ACPCredentialServiceClient implements CredentialServiceClientInterface {
+	async getServerCredentials(_request: proto.cline.StringRequest): Promise<proto.host.ServerCredentials> {
+		Logger.debug("[ACPCredentialServiceClient] getServerCredentials called (stub)")
+		return proto.host.ServerCredentials.create({ serverName: _request.value, env: {} })
+	}
+
+	async storeServerCredentials(_request: proto.host.ServerCredentials): Promise<proto.cline.EmptyRequest> {
+		Logger.debug("[ACPCredentialServiceClient] storeServerCredentials called (stub)")
+		return proto.cline.EmptyRequest.create({})
+	}
+
+	async deleteServerCredentials(_request: proto.cline.StringRequest): Promise<proto.cline.EmptyRequest> {
+		Logger.debug("[ACPCredentialServiceClient] deleteServerCredentials called (stub)")
+		return proto.cline.EmptyRequest.create({})
+	}
+}
+
 export class ACPHostBridgeClientProvider implements HostBridgeClientProvider {
 	workspaceClient: WorkspaceServiceClientInterface
 	envClient: EnvServiceClientInterface
 	windowClient: WindowServiceClientInterface
 	diffClient: DiffServiceClientInterface
+	credentialClient: CredentialServiceClientInterface
 
 	/**
 	 * Creates a new ACPHostBridgeClientProvider.
@@ -402,11 +427,12 @@ export class ACPHostBridgeClientProvider implements HostBridgeClientProvider {
 		clientCapabilities: acp.ClientCapabilities | undefined,
 		sessionIdResolver: SessionIdResolver,
 		cwdResolver: CwdResolver,
-		version: string = "1.0.0",
+		version = "1.0.0",
 	) {
 		this.workspaceClient = new ACPWorkspaceServiceClient(clientCapabilities, sessionIdResolver, cwdResolver)
 		this.envClient = new ACPEnvServiceClient(clientCapabilities, sessionIdResolver, version)
 		this.windowClient = new ACPWindowServiceClient(clientCapabilities, sessionIdResolver)
 		this.diffClient = new ACPDiffServiceClient()
+		this.credentialClient = new ACPCredentialServiceClient()
 	}
 }
