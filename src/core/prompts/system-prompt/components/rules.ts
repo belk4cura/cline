@@ -44,7 +44,7 @@ export async function getRulesSection(variant: PromptVariant, context: SystemPro
 	const browserRules = context.supportsBrowserUse
 		? BROWSER_RULES
 		: context.mcpBrowserAvailable
-			? `- The user may ask generic non-development tasks, such as "what\\'s the latest news" or "look up the weather in San Diego", in which case you should use the cura-browser MCP tools to complete the task rather than trying to create a website or using curl. For multi-step browser tasks (shopping, research, form filling, any task requiring more than 2 steps), ALWAYS prefer the browser_agent tool — it handles navigation, clicking, typing, new tabs, and error recovery autonomously in a single call. Only use individual tools (browser_navigate, browser_act, browser_observe) for simple one-off actions.\n`
+			? `- When a task involves visiting websites, shopping, web research, filling forms, or any browser interaction, you MUST use the browser_agent tool from the cura-browser MCP server with the ENTIRE task as a single call. Do NOT break browser tasks into individual browser_navigate/browser_act/browser_observe/browser_extract steps — even if the task description includes numbered steps. The browser_agent tool handles all navigation, clicking, typing, scrolling, new tabs, and error recovery autonomously. Only use individual browser tools (browser_navigate, browser_screenshot) for trivial single-action requests like "take a screenshot of this URL".\n`
 			: ""
 	const browserWaitRules = context.supportsBrowserUse ? BROWSER_WAIT_RULES : ""
 	const cliRules = context.isCliEnvironment ? CLI_RULES : ""
