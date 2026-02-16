@@ -4,7 +4,13 @@ import type { PromptVariant, SystemPromptContext } from "../types"
 
 const BROWSER_RULES = `- The user may ask generic non-development tasks, such as "what\\'s the latest news" or "look up the weather in San Diego", in which case you might use the browser_action tool to complete the task if it makes sense to do so, rather than trying to create a website or using curl to answer the question. However, if an available MCP server tool or resource can be used instead, you should prefer to use it over browser_action.\n`
 
+const MCP_BROWSER_RULES = `- The user may ask generic non-development tasks such as "what\\'s the latest news", "look up the weather", or "add this item to my cart". Use the cura-browser MCP tools (browser_navigate, browser_snapshot, browser_click, browser_type, etc.) to accomplish these tasks directly in the browser. Do NOT use curl or create websites — use the browser tools instead.
+- When using cura-browser MCP tools, always call browser_snapshot after each navigation or interaction to see the updated accessibility tree. Use the ref numbers from the snapshot to target elements for clicking, typing, etc.
+- Do NOT use the browser_action tool — use the cura-browser MCP server tools instead (browser_navigate, browser_snapshot, browser_click, browser_type, browser_screenshot, etc.).\n`
+
 const BROWSER_WAIT_RULES = ` Then if you want to test your work, you might use browser_action to launch the site, wait for the user's response confirming the site was launched along with a screenshot, then perhaps e.g., click a button to test functionality if needed, wait for the user's response confirming the button was clicked along with a screenshot of the new state, before finally closing the browser.`
+
+const MCP_BROWSER_WAIT_RULES = ` Then if you want to test your work, you might use the cura-browser MCP tools to navigate to the site, take a snapshot to verify rendering, click buttons to test functionality, and take a screenshot to confirm the result.`
 
 const CLI_RULES = `- After making code changes, consider running any available validation tools for the project (such as type checkers, linters, or build scripts like \`npm run lint\`, \`npx tsc --noEmit\`, \`npm run build\`) to catch errors, since you won't receive automatic diagnostics after edits.\n`
 
@@ -41,12 +47,12 @@ const getRulesTemplateText = (context: SystemPromptContext) => `RULES
 export async function getRulesSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
 	const template = variant.componentOverrides?.[SystemPromptSection.RULES]?.template || getRulesTemplateText
 
-	const browserRules = context.supportsBrowserUse
-		? BROWSER_RULES
-		: context.mcpBrowserAvailable
-			? `- When a task involves visiting websites, shopping, web research, filling forms, or any browser interaction, you MUST use the browser_agent tool from the cura-browser MCP server with the ENTIRE task as a single call. Do NOT break browser tasks into individual browser_navigate/browser_act/browser_observe/browser_extract steps — even if the task description includes numbered steps. The browser_agent tool handles all navigation, clicking, typing, scrolling, new tabs, and error recovery autonomously. Only use individual browser tools (browser_navigate, browser_screenshot) for trivial single-action requests like "take a screenshot of this URL".\n`
+	const browserRules = context.mcpBrowserAvailable ? MCP_BROWSER_RULES : context.supportsBrowserUse ? BROWSER_RULES : ""
+	const browserWaitRules = context.mcpBrowserAvailable
+		? MCP_BROWSER_WAIT_RULES
+		: context.supportsBrowserUse
+			? BROWSER_WAIT_RULES
 			: ""
-	const browserWaitRules = context.supportsBrowserUse ? BROWSER_WAIT_RULES : ""
 	const cliRules = context.isCliEnvironment ? CLI_RULES : ""
 
 	return new TemplateEngine().resolve(template, context, {

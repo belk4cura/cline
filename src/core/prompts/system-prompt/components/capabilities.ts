@@ -15,31 +15,19 @@ const getCapabilitiesTemplateText = (context: SystemPromptContext) => `CAPABILIT
 export async function getCapabilitiesSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
 	const template = variant.componentOverrides?.[SystemPromptSection.CAPABILITIES]?.template || getCapabilitiesTemplateText
 
-	const browserSupport = context.supportsBrowserUse
-		? ", use the browser"
-		: context.mcpBrowserAvailable
-			? ", use browser automation tools"
+	const browserSupport = context.mcpBrowserAvailable
+		? ", use the browser via MCP"
+		: context.supportsBrowserUse
+			? ", use the browser"
 			: ""
-	const browserCapabilities = context.supportsBrowserUse
-		? `\n- You can use the browser_action tool to interact with websites (including html files and locally running development servers) through a Puppeteer-controlled browser when you feel it is necessary in accomplishing the user's task. This tool is particularly useful for web development tasks as it allows you to launch a browser, navigate to pages, interact with elements through clicks and keyboard input, and capture the results through screenshots and console logs. This tool may be useful at key stages of web development tasks-such as after implementing new features, making substantial changes, when troubleshooting issues, or to verify the result of your work. You can analyze the provided screenshots to ensure correct rendering or identify errors, and review console logs for runtime issues.\n\t- For example, if asked to add a component to a react website, you might create the necessary files, use execute_command to run the site locally, then use browser_action to launch the browser, navigate to the local server, and verify the component renders & functions correctly before closing the browser.`
-		: context.mcpBrowserAvailable
-			? `\n- You have AI-powered browser automation tools available via the cura-browser MCP server. These tools use natural language actions — describe what you want to do and the AI handles element targeting automatically.
-\t- **browser_agent** ⭐ (PREFERRED for multi-step tasks): Execute a complex browser task autonomously with a single call. The agent navigates, clicks, types, handles new tabs, scrolls, and recovers from errors on its own. Use this for tasks like shopping, form filling, research, or any multi-page workflow. Example: browser_agent with task "Go to ebay.com, search for dog toys, and add the most popular one to my cart". The agent handles everything including new tab detection. Preferred over individual browser_act/observe calls for tasks requiring more than 2-3 steps.
-\t- **browser_navigate**: Navigate to a URL (goto, goBack, goForward, refresh).
-\t- **browser_observe**: AI-powered element discovery. Describe what you're looking for (e.g., "Find all navigation links") and get back actionable selectors with descriptions.
-\t- **browser_act**: Perform actions using natural language. Just say what you want (e.g., "Click the Sign In button", "Type hello@example.com in the email field"). No element refs or coordinates needed — the AI identifies the right element.
-\t- **browser_extract**: Extract structured data from the page. Provide an instruction (e.g., "Extract all product names and prices") and a JSON schema, and get back structured data matching your schema.
-\t- **browser_screenshot**: Capture a screenshot for visual verification.
-\t- **browser_evaluate**: Run JavaScript in the page context for data extraction or DOM manipulation.
-\t- **browser_wait**: Wait for text, element, URL, load state, or a JavaScript condition.
-\t- **browser_file_upload**: Upload files to file input elements.
-\t- **browser_file_download**: Download files by clicking elements.
-\t- **browser_dialog**: Handle alert/confirm/prompt dialogs.
-\t- **browser_console**: Retrieve console logs and page errors for debugging.
-\t- **browser_tabs**: Manage browser tabs (list, switch, close, new).
-\t- **browser_status**: Check if a browser session is active.
-\t- Browser tools can be used alongside other tools — no need to close the browser before using file editing or command tools.
-\t- Workflow: navigate → observe (discover elements) → act (natural language) → screenshot (visual check). Use extract for structured data gathering.`
+	const browserCapabilities = context.mcpBrowserAvailable
+		? `\n- You have access to a full browser automation suite via the "cura-browser" MCP server (Playwright MCP). Use these tools to interact with websites, fill forms, click buttons, navigate pages, and take screenshots. The browser uses accessibility tree snapshots with ref-based element targeting — no CSS selectors or XPath needed.
+\t- **Workflow**: Use \`browser_navigate\` to go to a URL → \`browser_snapshot\` to get the page's accessibility tree with element refs → \`browser_click\`/\`browser_type\`/\`browser_select_option\` to interact using ref numbers → \`browser_screenshot\` to visually verify.
+\t- **Key tools**: browser_navigate, browser_snapshot, browser_click, browser_type, browser_hover, browser_select_option, browser_press_key, browser_screenshot, browser_scroll, browser_tab_list, browser_tab_new, browser_tab_close, browser_wait, browser_navigate_back, browser_file_upload, browser_handle_dialog.
+\t- For example, to search eBay: use browser_navigate to go to ebay.com → browser_snapshot to see the page → browser_click on the search box ref → browser_type to enter search terms → browser_click on search button → browser_snapshot to see results.
+\t- Always call browser_snapshot after navigation or interaction to see the updated page state. Use ref numbers from the snapshot to target elements.`
+		: context.supportsBrowserUse
+			? `\n- You can use the browser_action tool to interact with websites (including html files and locally running development servers) through a Puppeteer-controlled browser when you feel it is necessary in accomplishing the user's task. This tool is particularly useful for web development tasks as it allows you to launch a browser, navigate to pages, interact with elements through clicks and keyboard input, and capture the results through screenshots and console logs. This tool may be useful at key stages of web development tasks-such as after implementing new features, making substantial changes, when troubleshooting issues, or to verify the result of your work. You can analyze the provided screenshots to ensure correct rendering or identify errors, and review console logs for runtime issues.\n\t- For example, if asked to add a component to a react website, you might create the necessary files, use execute_command to run the site locally, then use browser_action to launch the browser, navigate to the local server, and verify the component renders & functions correctly before closing the browser.`
 			: ""
 
 	const webToolsCapabilities =

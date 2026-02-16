@@ -1771,13 +1771,12 @@ export class Task {
 
 		// Check if the cura-browser MCP server is connected — if so, disable the built-in
 		// Puppeteer-based browser_action tool and use the MCP browser tools instead.
-		// The MCP browser uses accessibility tree snapshots + ref-based targeting (OpenClaw model)
-		// which is fundamentally different from the coordinate-based Puppeteer approach.
-		const mcpBrowserAvailable = this.mcpHub.connections.some(
-			(conn) => conn.server.name === "cura-browser" && conn.server.status === "connected",
-		)
-
-		const supportsBrowserUse = mcpBrowserAvailable ? false : modelSupportsBrowserUse && !disableBrowserTool
+		// The MCP browser uses accessibility tree snapshots + ref-based targeting via Playwright MCP.
+		const mcpBrowserAvailable =
+			this.mcpHub?.connections?.some((conn) => conn.server.name === "cura-browser" && conn.server.status === "connected") ??
+			false
+		// When MCP browser is available, disable Puppeteer browser_action
+		const supportsBrowserUse = mcpBrowserAvailable ? false : (modelSupportsBrowserUse ?? false)
 		const preferredLanguageRaw = this.stateManager.getGlobalSettingsKey("preferredLanguage")
 		const preferredLanguage = getLanguageKey(preferredLanguageRaw as LanguageDisplay)
 		const preferredLanguageInstructions =
