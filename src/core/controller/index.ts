@@ -7,6 +7,7 @@ import { setupWorkspaceManager } from "@core/workspace/setup"
 import type { WorkspaceRootManager } from "@core/workspace/WorkspaceRootManager"
 import { cleanupLegacyCheckpoints } from "@integrations/checkpoints/CheckpointMigration"
 import { ClineAccountService } from "@services/account/ClineAccountService"
+import { LangfuseService } from "@services/langfuse"
 import { McpHub } from "@services/mcp/McpHub"
 import type { ApiProvider, ModelInfo } from "@shared/api"
 import type { ChatContent } from "@shared/ChatContent"
@@ -79,6 +80,9 @@ export class Controller {
 	private workspaceManager?: WorkspaceRootManager
 	private backgroundCommandRunning = false
 	private backgroundCommandTaskId?: string
+
+	// Cura thread_id from gRPC — used for Langfuse session mapping
+	public currentThreadId: string | null = null
 
 	// Flag to prevent duplicate cancellations from spam clicking
 	private cancelInProgress = false
@@ -155,6 +159,9 @@ export class Controller {
 		// Check CLI installation status once on startup
 		checkCliInstallation(this)
 
+		// Initialize Langfuse for LLM cost observability (non-blocking, no-op if keys not set)
+		LangfuseService.getInstance().initialize()
+
 		Logger.log("[Controller] ClineProvider instantiated")
 	}
 
@@ -172,6 +179,11 @@ export class Controller {
 
 		await this.clearTask()
 		this.mcpHub.dispose()
+
+		// Shutdown Langfuse client (flush + close)
+		LangfuseService.getInstance()
+			.shutdown()
+			.catch(() => {})
 
 		Logger.error("Controller disposed")
 	}
@@ -232,7 +244,15 @@ export class Controller {
 		files?: string[],
 		historyItem?: HistoryItem,
 		taskSettings?: Partial<Settings>,
+		threadId?: string,
 	) {
+		// Store Cura thread_id for Langfuse session mapping
+		this.currentThreadId = threadId || null
+
+		// Set Langfuse session context: thread_id (falls back to taskId later) + user_id
+		const sessionId = threadId || historyItem?.id || Date.now().toString()
+		LangfuseService.getInstance().setSession(sessionId, process.env.CURA_USER_ID)
+
 		// Fire-and-forget: We intentionally don't await fetchRemoteConfig here.
 		// Remote config is already fetched in startRemoteConfigTimer() which runs in the constructor,
 		// so enterprise policies (yoloModeAllowed, allowedMCPServers, etc.) are already applied.
@@ -1014,6 +1034,10 @@ export class Controller {
 		if (this.task) {
 			// Clear task settings cache when task ends
 			await this.stateManager.clearTaskSettings()
+			// Flush pending Langfuse events for this task
+			LangfuseService.getInstance()
+				.flush()
+				.catch(() => {})
 		}
 		await this.task?.abortTask()
 		this.task = undefined // removes reference to it, so once promises end it will be garbage collected

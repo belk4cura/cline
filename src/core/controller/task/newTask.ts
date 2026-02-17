@@ -72,6 +72,13 @@ export async function newTask(controller: Controller, request: NewTaskRequest): 
 		}).filter(([_, value]) => value !== undefined),
 	)
 
-	const taskId = await controller.initTask(request.text, request.images, request.files, undefined, filteredTaskSettings)
+	const taskId = await controller.initTask(
+		request.text,
+		request.images,
+		request.files,
+		undefined,
+		filteredTaskSettings,
+		request.threadId,
+	)
 	return String.create({ value: taskId || "" })
 }

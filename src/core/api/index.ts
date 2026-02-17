@@ -459,6 +459,20 @@ export function buildApiHandler(configuration: ApiConfiguration, mode: Mode): Ap
 
 	const apiProvider = mode === "plan" ? planModeApiProvider : actModeApiProvider
 
+	// Helper to wrap handler with Langfuse tracing (no-op if Langfuse is disabled)
+	const wrapHandler = (h: ApiHandler): ApiHandler => {
+		try {
+			const { wrapWithLangfuse } = require("./langfuse-wrapper")
+			return wrapWithLangfuse(h, {
+				providerId: apiProvider || "unknown",
+				model: h.getModel().id,
+				mode,
+			})
+		} catch {
+			return h
+		}
+	}
+
 	// Validate thinking budget tokens against model's maxTokens to prevent API errors
 	// wrapped in a try-catch for safety, but this should never throw
 	try {
@@ -475,12 +489,12 @@ export function buildApiHandler(configuration: ApiConfiguration, mode: Mode): Ap
 					options.actModeThinkingBudgetTokens = clippedValue
 				}
 			} else {
-				return handler // don't rebuild unless its necessary
+				return wrapHandler(handler) // don't rebuild unless its necessary
 			}
 		}
 	} catch (error) {
 		Logger.error("buildApiHandler error:", error)
 	}
 
-	return createHandlerForProvider(apiProvider, options, mode)
+	return wrapHandler(createHandlerForProvider(apiProvider, options, mode))
 }
