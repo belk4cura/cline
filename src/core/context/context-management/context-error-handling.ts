@@ -77,7 +77,7 @@ function checkIsBedrockContextWindowError(error: any): boolean {
 	try {
 		// Bedrock returns ValidationException for context window errors
 		const errorType = error?.name ?? error?.error?.type ?? error?.__type
-		const errorCode = error?.code ?? error?.error?.code ?? error?.$metadata?.httpStatusCode
+		const errorCode = error?.code ?? error?.error?.code ?? error?.$metadata?.httpStatusCode ?? error?.$fault
 
 		// Handle nested error structures (e.g., through Vercel AI SDK)
 		const nestedError = error?.error?.param
@@ -107,6 +107,8 @@ function checkIsBedrockContextWindowError(error: any): boolean {
 			/requested.*tokens.*exceeds.*limit/i,
 			/reduce.*length.*messages.*completion/i,
 			/input is too long/i,
+			/prompt is too long/i,
+			/prompt.*too long.*tokens?\s*>\s*\d+\s*maximum/i,
 		] as const
 
 		return BEDROCK_CONTEXT_PATTERNS.some((pattern) => pattern.test(message))
@@ -117,7 +119,7 @@ function checkIsBedrockContextWindowError(error: any): boolean {
 
 export function checkIsVercelContextWindowError(error: any): boolean {
 	try {
-		const status = error?.status ?? error?.error?.param?.statusCode ?? error?.statusCode
+		const status = error?.status ?? error?.error?.param?.statusCode ?? error?.statusCode ?? error?.$metadata?.httpStatusCode
 
 		// Check for explicit context_length_exceeded code (OpenAI streaming errors)
 		const errorCode = error?.error?.error?.code

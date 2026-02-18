@@ -799,7 +799,8 @@ export class AwsBedrockHandler implements ApiHandler {
 			// Check if this is a context window error - if so, throw it
 			// so the retry mechanism can handle truncation
 			const message = chunk.validationException.message || ""
-			const isContextError = /input.*too long|context.*exceed|maximum.*token|input length.*max.*tokens/i.test(message)
+			const isContextError =
+				/input.*too long|prompt.*too long|context.*exceed|maximum.*token|input length.*max.*tokens/i.test(message)
 
 			if (isContextError) {
 				// Throw as exception so context management can handle it

@@ -5,6 +5,9 @@
  * Intercepts the ApiStream to capture usage chunks and report them
  * as Langfuse generation observations. Completely transparent — if
  * Langfuse is disabled, returns the handler unchanged.
+ *
+ * Now captures input (system prompt + messages) and output (assistant
+ * response text) for full visibility in the Langfuse dashboard.
  */
 
 import { LangfuseService } from "@services/langfuse"
@@ -22,7 +25,8 @@ import type { ApiStream } from "./transform/stream"
  *   2. Creates a Langfuse trace with session/user context
  *   3. Passes through all ApiStream chunks unchanged
  *   4. Captures "usage" chunks for token counts
- *   5. Logs a generation observation after stream completes
+ *   5. Captures "text" chunks for output content
+ *   6. Logs a generation observation with input/output after stream completes
  *
  * @param handler - The original ApiHandler from buildApiHandler()
  * @param providerInfo - Provider metadata (providerId, model, mode)
@@ -49,7 +53,7 @@ export function wrapWithLangfuse(
 
 		createMessage(...args: Parameters<ApiHandler["createMessage"]>): ApiStream {
 			const originalStream = handler.createMessage(...args)
-			return wrapStream(originalStream, handler, providerInfo, langfuse)
+			return wrapStream(originalStream, handler, providerInfo, langfuse, args)
 		},
 	}
 }
@@ -59,6 +63,7 @@ async function* wrapStream(
 	handler: ApiHandler,
 	providerInfo: { providerId: string; model: string; mode: string },
 	langfuse: LangfuseService,
+	args: Parameters<ApiHandler["createMessage"]>,
 ): ApiStream {
 	const startTime = new Date()
 	const traceId = randomUUID()
@@ -66,6 +71,24 @@ async function* wrapStream(
 	const sessionId = langfuse.getSessionId() || "standalone"
 	const userId = langfuse.getUserId() || "unknown"
 	const { id: modelId } = handler.getModel()
+
+	// Capture input: system prompt (truncated) + message count
+	const [systemPrompt, messages] = args
+	const inputSummary = {
+		systemPrompt: systemPrompt ? systemPrompt.substring(0, 500) + (systemPrompt.length > 500 ? "..." : "") : "",
+		messageCount: messages?.length || 0,
+		lastUserMessage: (() => {
+			if (!messages || messages.length === 0) return ""
+			const lastMsg = messages[messages.length - 1]
+			if (typeof lastMsg === "object" && lastMsg !== null) {
+				const content = (lastMsg as any).content || (lastMsg as any).text || ""
+				if (typeof content === "string") {
+					return content.substring(0, 1000) + (content.length > 1000 ? "..." : "")
+				}
+			}
+			return ""
+		})(),
+	}
 
 	const trace = langfuse.createTrace({
 		traceId,
@@ -79,12 +102,26 @@ async function* wrapStream(
 		},
 	})
 
+	// Set input on the trace
+	if (trace) {
+		try {
+			trace.update({
+				input: inputSummary,
+			})
+		} catch {
+			// Non-critical
+		}
+	}
+
 	// Accumulate usage from stream chunks
 	let inputTokens = 0
 	let outputTokens = 0
 	let cacheWriteTokens = 0
 	let cacheReadTokens = 0
 	let totalCost: number | undefined
+
+	// Accumulate output text from stream
+	let outputText = ""
 
 	try {
 		for await (const chunk of stream) {
@@ -99,10 +136,32 @@ async function* wrapStream(
 				cacheReadTokens += chunk.cacheReadTokens ?? 0
 				totalCost = chunk.totalCost ?? totalCost
 			}
+
+			// Capture output text
+			if (chunk.type === "text") {
+				outputText += chunk.text
+			}
 		}
 	} finally {
 		// Log generation after stream completes (success or error)
 		const endTime = new Date()
+
+		// Truncate output for Langfuse (avoid massive payloads)
+		const truncatedOutput =
+			outputText.length > 5000
+				? outputText.substring(0, 5000) + `... [truncated, total ${outputText.length} chars]`
+				: outputText
+
+		// Update trace with output
+		if (trace && truncatedOutput) {
+			try {
+				trace.update({
+					output: truncatedOutput,
+				})
+			} catch {
+				// Non-critical
+			}
+		}
 
 		if (trace && (inputTokens > 0 || outputTokens > 0)) {
 			langfuse.logGeneration(trace, {
@@ -115,6 +174,8 @@ async function* wrapStream(
 				totalCost,
 				startTime,
 				endTime,
+				input: inputSummary,
+				output: truncatedOutput || undefined,
 				metadata: {
 					provider: providerInfo.providerId,
 					mode: providerInfo.mode,

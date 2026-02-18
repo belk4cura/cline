@@ -142,6 +142,7 @@ export class LangfuseService {
 
 	/**
 	 * Log an LLM generation observation on an existing trace.
+	 * Now includes input/output content for Langfuse dashboard visibility.
 	 */
 	logGeneration(trace: LangfuseTraceHandle, input: LangfuseGenerationInput): void {
 		if (!trace) {
@@ -154,6 +155,8 @@ export class LangfuseService {
 				model: input.model,
 				startTime: input.startTime,
 				endTime: input.endTime,
+				input: input.input,
+				output: input.output,
 				usage: {
 					input: input.inputTokens,
 					output: input.outputTokens,
@@ -168,6 +171,44 @@ export class LangfuseService {
 			})
 		} catch (error) {
 			Logger.log(`[LangfuseService] Failed to log generation (non-critical): ${error}`)
+		}
+	}
+
+	/**
+	 * Log a tool execution span on the most recent trace.
+	 * Called when Cline executes a tool (file op, command, MCP tool, etc.)
+	 *
+	 * @param toolName — e.g. "write_to_file", "execute_command", "use_mcp_tool"
+	 * @param input — Tool input (path, command, etc.)
+	 * @param output — Tool result (success/error, preview)
+	 * @param startTime — When tool execution started
+	 * @param endTime — When tool execution completed
+	 */
+	logToolSpan(
+		trace: LangfuseTraceHandle,
+		toolName: string,
+		input: Record<string, unknown>,
+		output: Record<string, unknown>,
+		startTime?: Date,
+		endTime?: Date,
+	): void {
+		if (!trace) {
+			return
+		}
+
+		try {
+			trace.span({
+				name: `tool:${toolName}`,
+				startTime: startTime || new Date(),
+				endTime: endTime || new Date(),
+				input,
+				output,
+				metadata: {
+					surface: "cline-desktop",
+				},
+			})
+		} catch (error) {
+			Logger.log(`[LangfuseService] Failed to log tool span (non-critical): ${error}`)
 		}
 	}
 

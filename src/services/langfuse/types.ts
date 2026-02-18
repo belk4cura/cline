@@ -41,5 +41,9 @@ export interface LangfuseGenerationInput {
 	totalCost?: number
 	startTime: Date
 	endTime: Date
+	/** LLM input (system prompt + messages summary) for Langfuse dashboard */
+	input?: unknown
+	/** LLM output (assistant response text) for Langfuse dashboard */
+	output?: unknown
 	metadata?: Record<string, unknown>
 }

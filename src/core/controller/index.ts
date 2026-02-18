@@ -245,13 +245,16 @@ export class Controller {
 		historyItem?: HistoryItem,
 		taskSettings?: Partial<Settings>,
 		threadId?: string,
+		userId?: string,
 	) {
 		// Store Cura thread_id for Langfuse session mapping
 		this.currentThreadId = threadId || null
 
-		// Set Langfuse session context: thread_id (falls back to taskId later) + user_id
+		// Set Langfuse session context: thread_id + user_id
+		// Priority: userId from gRPC > CURA_USER_ID env var > undefined
 		const sessionId = threadId || historyItem?.id || Date.now().toString()
-		LangfuseService.getInstance().setSession(sessionId, process.env.CURA_USER_ID)
+		const resolvedUserId = userId || process.env.CURA_USER_ID || undefined
+		LangfuseService.getInstance().setSession(sessionId, resolvedUserId)
 
 		// Fire-and-forget: We intentionally don't await fetchRemoteConfig here.
 		// Remote config is already fetched in startRemoteConfigTimer() which runs in the constructor,
