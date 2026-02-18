@@ -51,7 +51,7 @@ message NewTaskRequest {
   repeated string images = 3;
   repeated string files = 4;
   optional Settings task_settings = 5;
-  optional string thread_id = 6;  // Cura thread_id for Langfuse session mapping
+  optional string thread_id = 6; // Cura thread_id for Langfuse session mapping
 }
 
 // Request message for toggling task favorite status
