@@ -4,7 +4,9 @@ import type { PromptVariant, SystemPromptContext } from "../types"
 
 const BROWSER_RULES = `- The user may ask generic non-development tasks, such as "what\\'s the latest news" or "look up the weather in San Diego", in which case you might use the browser_action tool to complete the task if it makes sense to do so, rather than trying to create a website or using curl to answer the question. However, if an available MCP server tool or resource can be used instead, you should prefer to use it over browser_action.\n`
 
-const MCP_BROWSER_RULES = `- The user may ask generic non-development tasks such as "what\\'s the latest news", "look up the weather", or "add this item to my cart". Use the cura-browser MCP tools (browser_navigate, browser_snapshot, browser_click, browser_type, etc.) to accomplish these tasks directly in the browser. Do NOT use curl or create websites — use the browser tools instead.
+const MCP_BROWSER_RULES = `- You may be connected to the user's REAL Chrome browser via the Cura Browser Extension. The browser has their logged-in sessions, cookies, and open tabs. ALWAYS call browser_snapshot FIRST to see the current page before deciding whether to navigate.
+- The user may ask generic non-development tasks such as "what\\'s the latest news", "look up the weather", "check my email", or "add this item to my cart". Use the cura-browser MCP tools to accomplish these tasks directly in the browser. Do NOT use curl or create websites — use the browser tools instead.
+- If a non-browser MCP tool can handle the request (Gmail MCP for email, Notion MCP for notes, Calendar MCP for events, Slack MCP for messages, etc.), prefer it over browser automation — API tools are faster and more reliable than navigating websites.
 - When using cura-browser MCP tools, always call browser_snapshot after each navigation or interaction to see the updated accessibility tree. Use the ref numbers from the snapshot to target elements for clicking, typing, etc.
 - Do NOT use the browser_action tool — use the cura-browser MCP server tools instead (browser_navigate, browser_snapshot, browser_click, browser_type, browser_screenshot, etc.).\n`
 
