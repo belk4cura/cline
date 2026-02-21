@@ -1771,12 +1771,14 @@ export class Task {
 
 		// Check if the cura-browser MCP server is connected — if so, disable the built-in
 		// Puppeteer-based browser_action tool and use the MCP browser tools instead.
-		// The MCP browser uses accessibility tree snapshots + ref-based targeting via Playwright MCP.
+		// The MCP browser uses Playwright's native extension protocol via CDPRelayServer.
 		const mcpBrowserAvailable =
 			this.mcpHub?.connections?.some((conn) => conn.server.name === "cura-browser" && conn.server.status === "connected") ??
 			false
-		// When MCP browser is available, disable Puppeteer browser_action
-		const supportsBrowserUse = mcpBrowserAvailable ? false : (modelSupportsBrowserUse ?? false)
+		// ALWAYS disable built-in Puppeteer browser_action. We exclusively use the cura-browser
+		// MCP server which connects to the user's real Chrome via the Cura Browser Extension.
+		// Puppeteer opens a fresh headless browser with no sessions/cookies — never useful for us.
+		const supportsBrowserUse = false
 		const preferredLanguageRaw = this.stateManager.getGlobalSettingsKey("preferredLanguage")
 		const preferredLanguage = getLanguageKey(preferredLanguageRaw as LanguageDisplay)
 		const preferredLanguageInstructions =
